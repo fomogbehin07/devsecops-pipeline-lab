@@ -164,3 +164,55 @@ resource "aws_kms_key" "s3" {
 }
 
 
+resource "aws_sns_topic" "s3_events" {
+  name = "devsecops-s3-events"
+}
+
+resource "aws_sns_topic_policy" "s3_events" {
+  arn = aws_sns_topic.s3_events.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowS3Publish"
+      Effect    = "Allow"
+      Principal = { Service = "s3.amazonaws.com" }
+      Action    = "SNS:Publish"
+      Resource  = aws_sns_topic.s3_events.arn
+      Condition = {
+        ArnLike = {
+          "aws:SourceArn" = [
+            aws_s3_bucket.logs.arn,
+            aws_s3_bucket.demo.arn
+          ]
+        }
+        StringEquals = {
+          "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_s3_bucket_notification" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  topic {
+    topic_arn = aws_sns_topic.s3_events.arn
+    events    = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_sns_topic_policy.s3_events]
+}
+
+resource "aws_s3_bucket_notification" "demo" {
+  bucket = aws_s3_bucket.demo.id
+
+  topic {
+    topic_arn = aws_sns_topic.s3_events.arn
+    events    = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_sns_topic_policy.s3_events]
+}
+
