@@ -137,3 +137,30 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 }
 
 
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "s3_kms_key" {
+  statement {
+    sid    = "EnableAccountAdministration"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.current.937799780770}:root"
+      ]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_kms_key" "s3" {
+  description             = "KMS key for demo S3 bucket"
+  enable_key_rotation     = true
+  deletion_window_in_days = 7
+  policy                  = data.aws_iam_policy_document.s3_kms_key.json
+}
+
+
